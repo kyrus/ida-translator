@@ -519,11 +519,13 @@ class Translator(object):
 
 	def gotTranslatedData(self, translation, original, do_comment, do_xref):
 		self.model.addTranslation(self.ea, original, translation)
-		if do_comment:
-			MakeRptCmt(self.ea, translation.encode('ascii'))
-		if do_xref:
-			xref_name = string.translate(translation.encode('ascii'), self.transtable, self.deletechars)
-			MakeName(self.ea, 'a'+''.join([a.title() for a in xref_name.split(' ')]))
+
+		if len(translation) > 0:
+			if do_comment:
+				MakeRptCmt(self.ea, translation.encode('ascii'))
+			if do_xref:
+				xref_name = string.translate(translation.encode('ascii'), self.transtable, self.deletechars)
+				MakeName(self.ea, 'a'+''.join([a.title() for a in xref_name.split(' ')]))
 		idaapi.refresh_idaview_anyway()
 
 """
