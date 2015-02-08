@@ -10,6 +10,7 @@ import idc
 import bisect
 import pickle
 import os
+import traceback
 
 import chardet
 
@@ -505,6 +506,7 @@ class Translator(object):
 		try:
 			(encoding,original_string) = getUnicodeTranslatedString(ea,end_ea)
 		except:
+			Message(traceback.format_exc());
 			QtGui.QMessageBox.warning(None, 'Translations plugin', 
 				'Could not determine a suitable encoding for the text selected.')
 			return
