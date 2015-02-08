@@ -392,7 +392,7 @@ class TranslatorDialog(QtGui.QDialog):
 		self.ui.translatedTextBox.textChanged.connect(self.translatedTextChanged)
 
 		self.detected_encoding = None
-		self.previous_encoding = None
+		self.encoding = None
 
 		self.isValidEncoding = False
 
@@ -452,6 +452,7 @@ class TranslatorDialog(QtGui.QDialog):
 
 	def successCallback(self):
 		if self.callback_fn != None and self.isValidEncoding:
+			self.config.setFallbackEncoding(self.encoding)
 			self.callback_fn(self.translated_text, self.original_text.decode(self.encoding),
 				self.ui.commentCheckBox.isChecked(), self.ui.nameXrefCheckBox.isChecked())
 
@@ -518,7 +519,7 @@ class Translator(object):
 		try:
 			(encoding,original_string) = getUnicodeTranslatedString(ea,end_ea)
 		except:
-			encoding = "ascii"
+			encoding = self.config.getFallbackEncoding()
 
 		# display the dialog box
 		self.displayDialogBox(ea, length, getString(ea,end_ea), encoding)
@@ -722,6 +723,15 @@ class TranslatorConfig(object):
 
 	def setApiKey(self,new_key):
 		self.config['api_key'] = new_key
+
+	def getFallbackEncoding(self):
+		if self.config.has_key('fallback_encoding'):
+			return self.config['fallback_encoding']
+		else:
+			return "ascii"
+
+	def setFallbackEncoding(self,encoding):
+		self.config['fallback_encoding'] = encoding
 
 
 plg = None
