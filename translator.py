@@ -10,6 +10,7 @@ import idc
 import bisect
 import pickle
 import os
+import collections
 
 import chardet
 
@@ -294,13 +295,12 @@ class TranslateModel(QtCore.QAbstractTableModel):
 		if self.xlate_array == -1:
 			self.xlate_array = CreateArray('translations')
 
-		self.translations = []
-		self.translation_addrs = []
+		self.translations = collections.OrderedDict()
 
 		cur_ea = GetFirstIndex(AR_STR, self.xlate_array)
 		while cur_ea != -1:
-			self.translation_addrs.append(cur_ea)
-			self.translations.append(pickle.loads(GetArrayElement(AR_STR, self.xlate_array, cur_ea)))
+			entry = pickle.loads(GetArrayElement(AR_STR, self.xlate_array, cur_ea))
+			self.translations[entry[0]] = entry
 			cur_ea = GetNextIndex(AR_STR, self.xlate_array, cur_ea)
 
 		print '[TranslatePlugin] Loaded %d translations' % len(self.translations)
@@ -320,9 +320,7 @@ class TranslateModel(QtCore.QAbstractTableModel):
 
 		if role == QtCore.Qt.DisplayRole:
 			i = index.row()
-			address = self.translations[i][0]
-			original_string = self.translations[i][1]
-			translation = self.translations[i][2]
+			(address, original_string, translation) = self.translations.values()[i]
 
 			if index.column() == 0:
 				return '%08x' % address
@@ -354,18 +352,18 @@ class TranslateModel(QtCore.QAbstractTableModel):
 				return None
 
 	def addTranslation(self, ea, original_text, translated_text):
-		# get position in the translation list for the new item
-		pos = bisect.bisect(self.translation_addrs, ea)
 		element = (ea, original_text, translated_text)
-		if len(self.translation_addrs) == 0 or self.translation_addrs[pos - 1] != ea:
+		pos = bisect.bisect(self.translations.keys(), ea)
+		if ea not in self.translations:
 			# we're adding a new element
 			self.beginInsertRows(QtCore.QModelIndex(), pos, pos)
-			self.translations = self.translations[:pos] + [element] + self.translations[pos:]
-			self.translation_addrs = self.translation_addrs[:pos] + [ea] + self.translation_addrs[pos:]
+			self.translations[ea] = element
+			# Note: OrderedDict is not SortedDict
+			self.translations = collections.OrderedDict(sorted(self.translations.iteritems(), key=lambda x: x[0]))
 			self.endInsertRows()
 		else:
 			# modify existing element
-			self.translations[pos] = element
+			self.translations[ea] = element
 
 		# add to idb
 		SetArrayString(self.xlate_array, ea, pickle.dumps(element))
@@ -682,7 +680,7 @@ class TranslateFormClass(PluginForm):
 		self.tableview = tableview
 
 	def rowClicked(self, index):
-		ea = self.translationModel.translations[index.row()][0]
+		ea = self.translationModel.translations.keys()[index.row()]
 		print '[TranslatePlugin] Selected translation @ ea %08x' % ea
 		Jump(ea)
 
