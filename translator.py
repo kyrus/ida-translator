@@ -398,8 +398,8 @@ class TranslatorDialog(QtGui.QDialog):
 
 		self.translated_text = doc.toPlainText()
 
-	def encodingChanged(self, new_encoding):
-		self.encoding = new_encoding.split(' ')[0]
+	def encodingChanged(self, new_encoding_idx):
+		self.encoding = self.ui.encodingComboBox.itemData(new_encoding_idx)
 		new_text = ''
 		try:
 			new_text = self.original_text.decode(self.encoding)
@@ -445,10 +445,11 @@ class TranslatorDialog(QtGui.QDialog):
 				self.ui.commentCheckBox.isChecked(), self.ui.nameXrefCheckBox.isChecked())
 
 	def initializeEncodingList(self, detected_encoding):
-		self.ui.encodingComboBox.insertItems(0, default_encodings)
+		for s in default_encodings:
+			self.ui.encodingComboBox.addItem(s, s);
 		self.detected_encoding = detected_encoding
 		self.ui.encodingComboBox.insertSeparator(0)
-		self.ui.encodingComboBox.insertItem(0, "%s (auto-detected)" % detected_encoding)
+		self.ui.encodingComboBox.insertItem(0, "%s (auto-detected)" % detected_encoding, detected_encoding)
 		self.ui.encodingComboBox.setCurrentIndex(0)
 		self.isValidEncoding = True
 
