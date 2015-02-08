@@ -398,19 +398,23 @@ class TranslatorDialog(QtGui.QDialog):
 
 		self.translated_text = doc.toPlainText()
 
-	def encodingChanged(self, new_encoding_idx):
-		self.encoding = self.ui.encodingComboBox.itemData(new_encoding_idx)
+	def setEncoding(self, encoding):
+		self.encoding = encoding
 		new_text = ''
 		try:
-			new_text = self.original_text.decode(self.encoding)
+			new_text = self.original_text.decode(encoding)
 			self.isValidEncoding = True
 			self.ui.translateButton.setEnabled(True)
 		except UnicodeDecodeError as e:
 			new_text = "(Error: %s)" % (e,)
 			self.ui.translateButton.setEnabled(False)
 			self.isValidEncoding = False
+
 		self.ui.originalTextBox.setPlainText(new_text)
 		self.clearTranslatedText()
+
+	def encodingChanged(self, new_encoding_idx):
+		self.setEncoding(self.ui.encodingComboBox.itemData(new_encoding_idx))
 
 	def translateButtonPressed(self):
 		# call translate upon button press
@@ -420,9 +424,7 @@ class TranslatorDialog(QtGui.QDialog):
 
 	def setOriginalText(self, original_text, detected_encoding):
 		self.original_text = original_text
-		self.encoding = detected_encoding
-		self.ui.originalTextBox.setPlainText(original_text.decode(self.encoding))
-		self.clearTranslatedText()
+		self.setEncoding(detected_encoding)
 
 		self.initializeEncodingList(detected_encoding)
 
@@ -446,7 +448,7 @@ class TranslatorDialog(QtGui.QDialog):
 
 	def initializeEncodingList(self, detected_encoding):
 		for s in default_encodings:
-			self.ui.encodingComboBox.addItem(s, s);
+			self.ui.encodingComboBox.addItem(s, s)
 		self.detected_encoding = detected_encoding
 		self.ui.encodingComboBox.insertSeparator(0)
 		self.ui.encodingComboBox.insertItem(0, "%s (auto-detected)" % detected_encoding, detected_encoding)
@@ -507,10 +509,7 @@ class Translator(object):
 		try:
 			(encoding,original_string) = getUnicodeTranslatedString(ea,end_ea)
 		except:
-			Message(traceback.format_exc());
-			QtGui.QMessageBox.warning(None, 'Translations plugin', 
-				'Could not determine a suitable encoding for the text selected.')
-			return
+			encoding = "ascii"
 
 		# display the dialog box
 		self.displayDialogBox(ea, length, getString(ea,end_ea), encoding)
