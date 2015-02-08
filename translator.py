@@ -355,17 +355,21 @@ class TranslateModel(QtCore.QAbstractTableModel):
 
 	def addTranslation(self, ea, original_text, translated_text):
 		# get position in the translation list for the new item
-		new_pos = bisect.bisect(self.translation_addrs, ea)
-		if len(self.translation_addrs) == 0 or self.translation_addrs[new_pos - 1] != ea:
+		pos = bisect.bisect(self.translation_addrs, ea)
+		element = (ea, original_text, translated_text)
+		if len(self.translation_addrs) == 0 or self.translation_addrs[pos - 1] != ea:
 			# we're adding a new element
-			new_element = (ea, original_text, translated_text)
-			self.beginInsertRows(QtCore.QModelIndex(), new_pos, new_pos)
-			self.translations = self.translations[:new_pos] + [new_element] + self.translations[new_pos:]
-			self.translation_addrs = self.translation_addrs[:new_pos] + [ea] + self.translation_addrs[new_pos:]
+			self.beginInsertRows(QtCore.QModelIndex(), pos, pos)
+			self.translations = self.translations[:pos] + [element] + self.translations[pos:]
+			self.translation_addrs = self.translation_addrs[:pos] + [ea] + self.translation_addrs[pos:]
 			self.endInsertRows()
+		else:
+			# modify existing element
+			self.translations[pos] = element
 
-			# add to idb
-			SetArrayString(self.xlate_array, ea, pickle.dumps(new_element))
+		# add to idb
+		SetArrayString(self.xlate_array, ea, pickle.dumps(element))
+
 
 """
 Dialog box that is invoked when the hotkey is pressed. This dialog should have
