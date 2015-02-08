@@ -477,21 +477,24 @@ class Translator(object):
 		chardet = __import__('chardet', globals(), locals(), [], -1)
 
 		# get the parameters (address, length) from IDA
-		ea = ScreenEA()
-		if ItemSize(ea) > 1:
-			end_ea = ea + ItemSize(ea)
-		else:
-			# find next named byte
-			end_ea = NextHead(ScreenEA())
-			for i in range(ea+1, end_ea):
-				name = GetTrueNameEx(BADADDR, i)
-				b = Byte(i)
-				if name != '':
-					end_ea = i
-					break
-				elif b == 0:
-					end_ea = i
-					break
+		ea = SelStart()
+		end_ea = SelEnd()
+		if ea == BADADDR:
+			ea = ScreenEA()
+			if ItemSize(ea) > 1:
+				end_ea = ea + ItemSize(ea)
+			else:
+				# find next named byte
+				end_ea = NextHead(ScreenEA())
+				for i in range(ea+1, end_ea):
+					name = GetTrueNameEx(BADADDR, i)
+					b = Byte(i)
+					if name != '':
+						end_ea = i
+						break
+					elif b == 0:
+						end_ea = i
+						break
 
 		length = end_ea - ea
 
