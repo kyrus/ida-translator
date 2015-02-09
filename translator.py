@@ -10,6 +10,7 @@ import idc
 import bisect
 import pickle
 import os
+import collections
 
 import chardet
 
@@ -158,6 +159,32 @@ default_encodings = [
  'big5',
  'big5hkscs',
  'cp037',
+ 'cp424',
+ 'cp437',
+ 'cp500',
+ 'cp720',
+ 'cp737',
+ 'cp775',
+ 'cp850',
+ 'cp852',
+ 'cp855',
+ 'cp856',
+ 'cp857',
+ 'cp858',
+ 'cp860',
+ 'cp861',
+ 'cp862',
+ 'cp863',
+ 'cp864',
+ 'cp865',
+ 'cp866',
+ 'cp869',
+ 'cp874',
+ 'cp875',
+ 'cp932',
+ 'cp949',
+ 'cp950',
+ 'cp1006',
  'cp1026',
  'cp1140',
  'cp1250',
@@ -169,33 +196,13 @@ default_encodings = [
  'cp1256',
  'cp1257',
  'cp1258',
- 'cp424',
- 'cp437',
- 'cp500',
- 'cp775',
- 'cp850',
- 'cp852',
- 'cp855',
- 'cp857',
- 'cp860',
- 'cp861',
- 'cp862',
- 'cp863',
- 'cp864',
- 'cp865',
- 'cp866',
- 'cp869',
- 'cp932',
- 'cp949',
- 'cp950',
+ 'euc_jp',
  'euc_jis_2004',
  'euc_jisx0213',
- 'euc_jp',
  'euc_kr',
- 'gb18030',
  'gb2312',
  'gbk',
- 'hp_roman8',
+ 'gb18030',
  'hz',
  'iso2022_jp',
  'iso2022_jp_1',
@@ -204,12 +211,7 @@ default_encodings = [
  'iso2022_jp_3',
  'iso2022_jp_ext',
  'iso2022_kr',
- 'iso8859_10',
- 'iso8859_11',
- 'iso8859_13',
- 'iso8859_14',
- 'iso8859_15',
- 'iso8859_16',
+ 'latin_1',
  'iso8859_2',
  'iso8859_3',
  'iso8859_4',
@@ -218,28 +220,35 @@ default_encodings = [
  'iso8859_7',
  'iso8859_8',
  'iso8859_9',
+ 'iso8859_10',
+ 'iso8859_13',
+ 'iso8859_14',
+ 'iso8859_15',
+ 'iso8859_16',
  'johab',
- 'koi8-r',
- 'latin1',
+ 'koi8_r',
+ 'koi8_u',
  'mac_cyrillic',
  'mac_greek',
  'mac_iceland',
  'mac_latin2',
  'mac_roman',
  'mac_turkish',
- 'mbcs',
  'ptcp154',
  'shift_jis',
  'shift_jis_2004',
  'shift_jisx0213',
- 'utf16',
- 'utf_16_be',
- 'utf_16_le',
  'utf_32',
  'utf_32_be',
  'utf_32_le',
- 'utf7',
- 'utf8']
+ 'utf_16',
+ 'utf_16_be',
+ 'utf_16_le',
+ 'utf_7',
+ 'utf_8',
+ 'utf_8_sig',
+ 'mbcs',
+ 'palmos']
 
 
 def getString(startea, endea):
@@ -286,13 +295,12 @@ class TranslateModel(QtCore.QAbstractTableModel):
 		if self.xlate_array == -1:
 			self.xlate_array = CreateArray('translations')
 
-		self.translations = []
-		self.translation_addrs = []
+		self.translations = collections.OrderedDict()
 
 		cur_ea = GetFirstIndex(AR_STR, self.xlate_array)
 		while cur_ea != -1:
-			self.translation_addrs.append(cur_ea)
-			self.translations.append(pickle.loads(GetArrayElement(AR_STR, self.xlate_array, cur_ea)))
+			entry = pickle.loads(GetArrayElement(AR_STR, self.xlate_array, cur_ea))
+			self.translations[entry[0]] = entry
 			cur_ea = GetNextIndex(AR_STR, self.xlate_array, cur_ea)
 
 		print '[TranslatePlugin] Loaded %d translations' % len(self.translations)
@@ -312,9 +320,7 @@ class TranslateModel(QtCore.QAbstractTableModel):
 
 		if role == QtCore.Qt.DisplayRole:
 			i = index.row()
-			address = self.translations[i][0]
-			original_string = self.translations[i][1]
-			translation = self.translations[i][2]
+			(address, original_string, translation) = self.translations.values()[i]
 
 			if index.column() == 0:
 				return '%08x' % address
@@ -346,18 +352,22 @@ class TranslateModel(QtCore.QAbstractTableModel):
 				return None
 
 	def addTranslation(self, ea, original_text, translated_text):
-		# get position in the translation list for the new item
-		new_pos = bisect.bisect(self.translation_addrs, ea)
-		if len(self.translation_addrs) == 0 or self.translation_addrs[new_pos - 1] != ea:
+		element = (ea, original_text, translated_text)
+		pos = bisect.bisect(self.translations.keys(), ea)
+		if ea not in self.translations:
 			# we're adding a new element
-			new_element = (ea, original_text, translated_text)
-			self.beginInsertRows(QtCore.QModelIndex(), new_pos, new_pos)
-			self.translations = self.translations[:new_pos] + [new_element] + self.translations[new_pos:]
-			self.translation_addrs = self.translation_addrs[:new_pos] + [ea] + self.translation_addrs[new_pos:]
+			self.beginInsertRows(QtCore.QModelIndex(), pos, pos)
+			self.translations[ea] = element
+			# Note: OrderedDict is not SortedDict
+			self.translations = collections.OrderedDict(sorted(self.translations.iteritems(), key=lambda x: x[0]))
 			self.endInsertRows()
+		else:
+			# modify existing element
+			self.translations[ea] = element
 
-			# add to idb
-			SetArrayString(self.xlate_array, ea, pickle.dumps(new_element))
+		# add to idb
+		SetArrayString(self.xlate_array, ea, pickle.dumps(element))
+
 
 """
 Dialog box that is invoked when the hotkey is pressed. This dialog should have
@@ -382,7 +392,7 @@ class TranslatorDialog(QtGui.QDialog):
 		self.ui.translatedTextBox.textChanged.connect(self.translatedTextChanged)
 
 		self.detected_encoding = None
-		self.previous_encoding = None
+		self.encoding = None
 
 		self.isValidEncoding = False
 
@@ -397,19 +407,23 @@ class TranslatorDialog(QtGui.QDialog):
 
 		self.translated_text = doc.toPlainText()
 
-	def encodingChanged(self, new_encoding):
-		self.encoding = new_encoding.split(' ')[0]
+	def setEncoding(self, encoding):
+		self.encoding = encoding
 		new_text = ''
 		try:
-			new_text = self.original_text.decode(self.encoding)
+			new_text = self.original_text.decode(encoding)
 			self.isValidEncoding = True
 			self.ui.translateButton.setEnabled(True)
 		except UnicodeDecodeError as e:
 			new_text = "(Error: %s)" % (e,)
 			self.ui.translateButton.setEnabled(False)
 			self.isValidEncoding = False
+
 		self.ui.originalTextBox.setPlainText(new_text)
 		self.clearTranslatedText()
+
+	def encodingChanged(self, new_encoding_idx):
+		self.setEncoding(self.ui.encodingComboBox.itemData(new_encoding_idx))
 
 	def translateButtonPressed(self):
 		# call translate upon button press
@@ -419,9 +433,7 @@ class TranslatorDialog(QtGui.QDialog):
 
 	def setOriginalText(self, original_text, detected_encoding):
 		self.original_text = original_text
-		self.encoding = detected_encoding
-		self.ui.originalTextBox.setPlainText(original_text.decode(self.encoding))
-		self.clearTranslatedText()
+		self.setEncoding(detected_encoding)
 
 		self.initializeEncodingList(detected_encoding)
 
@@ -440,14 +452,16 @@ class TranslatorDialog(QtGui.QDialog):
 
 	def successCallback(self):
 		if self.callback_fn != None and self.isValidEncoding:
+			self.config.setFallbackEncoding(self.encoding)
 			self.callback_fn(self.translated_text, self.original_text.decode(self.encoding),
 				self.ui.commentCheckBox.isChecked(), self.ui.nameXrefCheckBox.isChecked())
 
 	def initializeEncodingList(self, detected_encoding):
-		self.ui.encodingComboBox.insertItems(0, default_encodings)
+		for s in default_encodings:
+			self.ui.encodingComboBox.addItem(s, s)
 		self.detected_encoding = detected_encoding
 		self.ui.encodingComboBox.insertSeparator(0)
-		self.ui.encodingComboBox.insertItem(0, "%s (auto-detected)" % detected_encoding)
+		self.ui.encodingComboBox.insertItem(0, "%s (auto-detected)" % detected_encoding, detected_encoding)
 		self.ui.encodingComboBox.setCurrentIndex(0)
 		self.isValidEncoding = True
 
@@ -477,21 +491,24 @@ class Translator(object):
 		chardet = __import__('chardet', globals(), locals(), [], -1)
 
 		# get the parameters (address, length) from IDA
-		ea = ScreenEA()
-		if ItemSize(ea) > 1:
-			end_ea = ea + ItemSize(ea)
-		else:
-			# find next named byte
-			end_ea = NextHead(ScreenEA())
-			for i in range(ea+1, end_ea):
-				name = GetTrueNameEx(BADADDR, i)
-				b = Byte(i)
-				if name != '':
-					end_ea = i
-					break
-				elif b == 0:
-					end_ea = i
-					break
+		ea = SelStart()
+		end_ea = SelEnd()
+		if ea == BADADDR:
+			ea = ScreenEA()
+			if ItemSize(ea) > 1:
+				end_ea = ea + ItemSize(ea)
+			else:
+				# find next named byte
+				end_ea = NextHead(ScreenEA())
+				for i in range(ea+1, end_ea):
+					name = GetTrueNameEx(BADADDR, i)
+					b = Byte(i)
+					if name != '':
+						end_ea = i
+						break
+					elif b == 0:
+						end_ea = i
+						break
 
 		length = end_ea - ea
 
@@ -502,9 +519,7 @@ class Translator(object):
 		try:
 			(encoding,original_string) = getUnicodeTranslatedString(ea,end_ea)
 		except:
-			QtGui.QMessageBox.warning(None, 'Translations plugin', 
-				'Could not determine a suitable encoding for the text selected.')
-			return
+			encoding = self.config.getFallbackEncoding()
 
 		# display the dialog box
 		self.displayDialogBox(ea, length, getString(ea,end_ea), encoding)
@@ -519,11 +534,13 @@ class Translator(object):
 
 	def gotTranslatedData(self, translation, original, do_comment, do_xref):
 		self.model.addTranslation(self.ea, original, translation)
-		if do_comment:
-			MakeRptCmt(self.ea, translation.encode('ascii'))
-		if do_xref:
-			xref_name = string.translate(translation.encode('ascii'), self.transtable, self.deletechars)
-			MakeName(self.ea, 'a'+''.join([a.title() for a in xref_name.split(' ')]))
+
+		if len(translation) > 0:
+			if do_comment:
+				MakeRptCmt(self.ea, translation.encode('ascii'))
+			if do_xref:
+				xref_name = string.translate(translation.encode('ascii'), self.transtable, self.deletechars)
+				idaapi.do_name_anyway(self.ea, 'a'+''.join([a.title() for a in xref_name.split(' ')]))
 		idaapi.refresh_idaview_anyway()
 
 """
@@ -664,7 +681,7 @@ class TranslateFormClass(PluginForm):
 		self.tableview = tableview
 
 	def rowClicked(self, index):
-		ea = self.translationModel.translations[index.row()][0]
+		ea = self.translationModel.translations.keys()[index.row()]
 		print '[TranslatePlugin] Selected translation @ ea %08x' % ea
 		Jump(ea)
 
@@ -706,6 +723,15 @@ class TranslatorConfig(object):
 
 	def setApiKey(self,new_key):
 		self.config['api_key'] = new_key
+
+	def getFallbackEncoding(self):
+		if self.config.has_key('fallback_encoding'):
+			return self.config['fallback_encoding']
+		else:
+			return "ascii"
+
+	def setFallbackEncoding(self,encoding):
+		self.config['fallback_encoding'] = encoding
 
 
 plg = None

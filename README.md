@@ -12,7 +12,7 @@ The IDA Pro translator is a plugin for IDA Pro that assists in decoding arbitrar
 4. [PySide Python-Qt bindings](https://www.hex-rays.com/products/ida/support/download.shtml).
 5. [The Python chardet module](http://pypi.python.org/pypi/chardet).
 6. Appropriate fonts for the scripts you will encounter in your IDA databases. For example, to ensure you have the fonts required to display Chinese text in Windows XP, install the East Asian font pack. If you don't have a font to display the text, you will just see the Unicode fallback character (a rectangle on Windows).
-7. [A Google Translate API key](https://code.google.com/apis/console/b/0/) if you want to use the automatic translation feature.
+7. (optional) [A Google Translate API key](https://code.google.com/apis/console/b/0/) if you want to use the automatic translation feature.
 
 Once the prerequisites are installed, drop the translator.py file into your IDA Pro 6.x plugins directory. Launch IDA and you will now have a new entry in Edit->Plugins named "Translations". Select the menu item or hit the hot key `Ctrl-Alt-R`. The first time the plugin is launched, it will ask for your Google Translate API key. Get one from [Google's API page](https://code.google.com/apis/console/b/0/) and enter it into this dialog box.
 
